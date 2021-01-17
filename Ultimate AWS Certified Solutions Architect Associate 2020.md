@@ -15,8 +15,8 @@
   - [12. (***DONE***) CloudFront & AWS Global Accelerator](#12-done-cloudfront--aws-global-accelerator)
   - [13. AWS Storage Extras](#13-aws-storage-extras)
   - [14. "Decoupling applications: SQS, SNS, Kinesis, Active MQ"](#14-decoupling-applications-sqs-sns-kinesis-active-mq)
-  - [15. (***WIP***)Serverless Overviews from a Solution Architect Perspective](#15-wipserverless-overviews-from-a-solution-architect-perspective)
-  - [16. Serverless Solution Architecture Discussions](#16-serverless-solution-architecture-discussions)
+  - [15. (***DONE***)Serverless Overviews from a Solution Architect Perspective](#15-doneserverless-overviews-from-a-solution-architect-perspective)
+  - [16. (***WIP***) Serverless Solution Architecture Discussions](#16-wip-serverless-solution-architecture-discussions)
   - [17. (***DONE***) Databases in AWS](#17-done-databases-in-aws)
   - [18. "AWS Monitoring & Audit: CloudWatch, CloudTrail & Config"](#18-aws-monitoring--audit-cloudwatch-cloudtrail--config)
   - [19. Identity and Access Management (IAM) - Advanced](#19-identity-and-access-management-iam---advanced)
@@ -1431,7 +1431,7 @@
  - [ ] Amazon MQ
  - [ ] Messaging and Integration Quiz
 
-## 15. (***WIP***)Serverless Overviews from a Solution Architect Perspective
+## 15. (***DONE***)Serverless Overviews from a Solution Architect Perspective
 
  - [x] About the Serverless Section
  - [x] Serverless Introduction
@@ -1676,7 +1676,7 @@
     - SAM can run Lambda, API Gateway, DynamoDB locally
     - SAM can use CodeDeploy to deploy Lambda functions
 
- - [ ] Serverless Quiz
+ - [x] Serverless Quiz
 
     1. Lambda max timeout is 15 minutes
     2. Environment variables allow for your Lambda to have dynamic variables from within
@@ -1688,15 +1688,161 @@
     8. Cognito User Pools directly integration with Facebook Logins
     9. WCU & RCU with autoscaling works best for smooth sustained usage (capacity planning for provisioned usage); on demand
 
-## 16. Serverless Solution Architecture Discussions
+## 16. (***WIP***) Serverless Solution Architecture Discussions
 
- - [ ] "Mobile Application: MyTodoList"
- - [ ] "Serverless Website: MyBlog.com"
- - [ ] MicroServices Architecture
- - [ ] Distributing Paid Content
- - [ ] Software updates distribution
- - [ ] Big Data Ingestion Pipeline
- - [ ] Serverless Architectures Quiz
+ - [x] "Mobile Application: MyTodoList"
+
+    Requirements
+    - expose as rest api with https
+    - serverless architecture
+    - users directly interact with their own folder in S3
+    - users authenticate through a managed serverless service
+    - users can write and read to-dos, but they mostly read them
+    - DB should scale and have high read throughput
+
+    REST API layer
+    - mobile client <-(rest https)-> API Gateway <-invoke-> lambda <-query-> DynamoDB
+      - mobile client <-authenticate-> Cognito <-verify authentication-> API Gateway
+    - mobile client <-store/retrieve files (permissions)-> S3
+      - mobile client <-authenticate-> Cognito <-generate temp credentials-> AWS STS
+
+    High read throughput, static data
+    - DAX (caching layer) before DynamoDB
+    - API Gateway: caching of responses
+
+    Summary
+    - serverless rest api: https, API Gateway, Lambda, DynamoDB
+    - use Cognito to generate temporary credentials with STS to access S3 bucket with restricted policy
+      - app users can directly access AWS resources this way
+      - pattern can be applied to DynamoDB, Lambda...
+    - DAX: caching the reads on DynamoDB
+    - API Gateway: caching responses
+    - security for authentication and authorisation with Cognito and STS
+
+ - [x] "Serverless Website: MyBlog.com"
+
+    Requirements
+    - website scale globally
+    - blogs are rarely written, but often read
+    - some of the website is purely static files, the rest is a dynamic REST API
+    - implement caching where possible
+    - newly subscribed users receive a welcome email
+    - photos uploaded to the blog should have thumbnail generated automatically
+
+    Serving static content globally and securely
+    - pending UML
+
+    Summary
+    - static content distributed through CloudFront with S3
+    - public serverless rest api without Cognito
+    - DynamoDB global table
+      - alternatively, Aurora global table
+    - DynamoDB streams to trigger Lambda function
+    - lambda function had an IAM role with SES permission
+    - SES (Simple Email Service) sends emails in a serverless way
+    - S3 can trigger SQS/SNS/Lambda to notify events
+
+ - [x] MicroServices Architecture
+
+    - services interact with each other directly using a REST API
+    - each micro service may have its own design
+    - leaner development lifecycle for each service
+
+    Microservices Environment
+    - pending UML
+
+    Discussion
+    - each micro service may have its own design
+    - synchronous: API Gateway, Load Balancers
+    - asynchronous: SQS, Kinesis, SNS, Lambda triggers (S3)
+    - challenges with microservices
+      - repeated overhead for creating each new microservice
+      - issues with optimising server density/utilisation
+      - complexity of running multiple versions of multiple microservices simultaneously
+      - proliferation of client-side code (frontend) requirements to integrate with many separate services
+    - some challenges are solved by serverless patterns
+      - API Gateway, Lambda scale automatically and pay per usage
+      - easily clone API, reproduce environments
+      - generated client SDK through Swagger integration for the API Gateway
+
+ - [x] Distributing Paid Content
+
+    - users to buy online videos
+    - each video can be bought by many customers
+    - only distribute videos to premium/paid users
+    - a DB of premium/paid users
+    - short-lived video links for paid users
+    - global application
+    - fully serverless
+ 
+    Architecture
+    - pending UML
+
+    Fully serverless solution
+    - Cognito for authentication
+    - DynamoDB for storing premium/paid users
+    - 2 serverless applications
+      - premium user registration
+      - CloudFront signed URL generator
+    - content is stored in S3 (serverless and scalable)
+    - CloudFront with OAI for security (users cannot bypass)
+    - CloudFront signed URL prevents unauthorised users
+    - S3 signed URL are not efficient for global access
+
+ - [x] Software updates distribution
+
+    Requirements
+    - application running on EC2 distributes software updates once in a while
+    - costly to distribute new software update in mass over the network
+    - without application change, how to optimise cost and CPU?
+
+    Why CloudFront?
+    - no change to application architecture
+    - cache software update files at the edge
+      - software update files are static (never changing)
+    - EC2 is not serverless, but CloudFront is and can scale automatically
+    - cost saving as ASG won't scale as much
+    - cost saving in availability and network bandwidth etc.
+    - easy way to make an existing application more scalable and cheaper
+
+ - [x] Big Data Ingestion Pipeline
+
+    Fully serverless solution requirements
+    - serverless ingestiong pipeline
+    - collect data in real time
+    - transform data
+    - query the transformed data using SQL
+    - store query reports/results in S3
+    - load data into a warehouse and create dashboards
+
+    Big data ingestion pipeline
+    - pending UML
+
+    Summary
+    - IoT Core harvests/collects data from IoT devices
+    - Kinesis collects real-time data
+    - Firehose deliver data to S3 in near real-time (every 1min at highest frequency)
+    - Lambda transform data in Firehose
+    - S3 triggers notification to SQS
+    - Lambda can subscribe to SQS
+      - alternatively connect S3 directly with Lambda
+    - Athena is a serverless SQL service and results are stored in S3
+    - reporting bucket contains analysed data and can be used by reporting tool such as AWS QuickSight, Redshift etc.
+
+ - [x] Serverless Architectures Quiz
+
+    1. API Gateway + AWS Lambda = fully serverless REST API
+    2. Lambda does not have an out of the box caching feature (it's often paired with API gateway for that)
+      API Gateway can cache responses
+      DynamoDB can have DAX
+    3. Cognito + STS federate mobile user login and generate temporary credentials for direct access to S3 bucket folders
+    4. CloudFront can distribute static contentin S3 globally (multiple regions)
+    5. DynamoDB Streams enable DynamoDB to get a changelog and use that changelog to replicate data across regions; required for DynamoDB global table
+    6. Lambda can read DynamoDB stream but cannot store messags in SQS -> Lambda IAM execution role missing permissions
+    7. SQS allows you to retain messages for days and process them later, while we take down our EC2 instances
+    8. CloudFront signed URL has security including IP restriction
+    9. CloudFront can be used in front of an ELB to cache static content, optimise network costs and reduce server load
+    10. Kinesis Data Streams delivers big data streams in real time to multiple consuming applications with replay features
 
 ## 17. (***DONE***) Databases in AWS
 
