@@ -1702,13 +1702,63 @@
 
     REST API layer
     - mobile client <-(rest https)-> API Gateway <-invoke-> lambda <-query-> DynamoDB
-      - mobile client <-authenticate-> Cognito <-verify authentication-> API Gateway
+
+      ```plantuml
+      @startuml
+      skinparam componentStyle rectangle
+      [client] <-> [API Gateway]:HTTPS REST
+      [API Gateway] <-> [Lambda]:invoke
+      [Lambda] <-> [DynamoDB]:query
+      @enduml
+      ```
+
+    - mobile client <-authenticate-> Cognito <-verify authentication-> API Gateway
+    
+      ```plantuml
+      @startuml
+      skinparam componentStyle rectangle
+      [client] <-> [API Gateway]:HTTPS REST
+      [API Gateway] <-> [Lambda]:invoke
+      [Lambda] <-> [DynamoDB]:query
+      [client] <-down-> [Cognito]:authenticate
+      [Cognito] <-> [API Gateway]:verify authentication
+      @enduml
+      ```
+
     - mobile client <-store/retrieve files (permissions)-> S3
       - mobile client <-authenticate-> Cognito <-generate temp credentials-> AWS STS
+
+      ```plantuml
+      @startuml
+      skinparam componentStyle rectangle
+      [client] <-> [API Gateway]:HTTPS REST
+      [API Gateway] <-> [Lambda]:invoke
+      [Lambda] <-> [DynamoDB]:query
+      [client] <-down-> [Cognito]:authenticate
+      [Cognito] <-> [API Gateway]:verify authentication
+      [Cognito] <-down-> [STS]:generate temp credentials
+      [client] <-> [S3]:store/retrieve files based on permissions
+      @enduml
+      ```      
 
     High read throughput, static data
     - DAX (caching layer) before DynamoDB
     - API Gateway: caching of responses
+    
+    ```plantuml
+    @startuml
+    skinparam componentStyle rectangle
+    [client] <-> [API Gateway]:HTTPS REST
+    [API Gateway] <-> [API Gateway]:caching responses
+    [API Gateway] <-down-> [Lambda]:invoke
+    [Lambda] <-> [DAX (caching layer)]:query/read
+    [client] <-down-> [Cognito]:authenticate
+    [Cognito] <-> [API Gateway]:verify authentication
+    [Cognito] <-down-> [STS]:generate temp credentials
+    [client] <-> [S3]:store/retrieve files based on permissions
+    [DAX (caching layer)] <-> [DynamoDB]
+    @enduml
+    ```      
 
     Summary
     - serverless rest api: https, API Gateway, Lambda, DynamoDB
@@ -1730,7 +1780,42 @@
     - photos uploaded to the blog should have thumbnail generated automatically
 
     Serving static content globally and securely
-    - pending UML
+    - user welcome email flow
+
+      ```plantuml
+      @startuml
+      skinparam componentStyle rectangle
+      [client] <-up-> [CloudFront]:interact with edge locations
+      [CloudFront] <-> [S3]:bucket policy only \n authorise access from OAI
+      [client] <-> [API Gateway]: HTTPS REST
+      [API Gateway] <-> [Lambda 1]:invoke
+      [Lambda 1] <-> [DAX (caching layer)]:query/read
+      [DAX (caching layer)] <-> [DynamoDB (global tables)]
+      [DynamoDB (global tables)] -down-> [DynamoDB Stream]:stream changes for new users
+      [DynamoDB Stream] -left-> [Lambda 2]:invoke
+      [Lambda 2] -left-> [SES]:SDK to send welcome email \n (Lambda 2 with correct \n IAM Role and Permissions)
+      @enduml
+      ```
+      
+    - thumbnail generation flow
+
+      ```plantuml
+      @startuml
+      skinparam componentStyle rectangle
+      [client] <-up-> [CloudFront 1]:interact with edge locations
+      [CloudFront 1] <-> [S3 Bucket 1]:bucket policy only \n authorise access from OAI
+      [client] <-> [API Gateway]: HTTPS REST
+      [API Gateway] <-> [Lambda 1]:invoke
+      [Lambda 1] <-> [DAX (caching layer)]:query/read
+      [DAX (caching layer)] <-> [DynamoDB (global tables)]
+      [client] <.down.> [S3 Bucket 2]:direct upload; or
+      [client] <-down-> [CloudFront 2]:upload photos \n S3 transfer acceleration
+      [CloudFront 2] <-> [S3 Bucket 2]:bucket policy only \n authorise access from OAI
+      [S3 Bucket 2] -> [Lambda 2]:trigger
+      [Lambda 2] -> [S3 Bucket 2/3...]:thumbnail
+      [S3 Bucket 2/3...] .> [SQS/SNS/...]: optional
+      @enduml
+      ```
 
     Summary
     - static content distributed through CloudFront with S3
