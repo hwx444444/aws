@@ -148,7 +148,7 @@
      - Service auto scaling with target tracking, step scaling, or scheduled
      - CLuster auto scaling through capacity providers
 
- - [ ] ECS Quiz
+ - [x] ECS Quiz
     1. ECS runs docker containers on AWS
     2. Which ECS config must you enable in `/etc/ecs/ecs.config` to allow your ECS tasks to endorse IAM roles?
 
